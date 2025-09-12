@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>あなたに変なコードネームをつけます</title>
+  <title>Codename Generator</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen bg-gradient-to-b from-white to-slate-50">
@@ -14,7 +14,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <script type="text/babel">
-    const { useMemo, useState } = React;
+    const { useState } = React;
 
     // --- 名前リスト ----------------------------------------------------------
     const codenameList = [
@@ -40,6 +40,7 @@
       "ドリーミング吾郎"
     ];
 
+    // 32-bit FNV-1a と軽量PRNG（名前+ソルトで疑似乱数を作る）
     function hashString(str) {
       let h = 0x811c9dc5;
       for (let i = 0; i < str.length; i++) {
@@ -48,7 +49,6 @@
       }
       return h >>> 0;
     }
-
     function mulberry32(seed) {
       let t = seed >>> 0;
       return function () {
@@ -62,12 +62,15 @@
     function App() {
       const [name, setName] = useState("");
       const [salt, setSalt] = useState(0);
+      const [result, setResult] = useState(null); // ← 初期は非表示
 
-      const result = useMemo(() => {
+      function generateCodename() {
         const baseSeed = hashString((name || "anonymous").trim());
         const rng = mulberry32(baseSeed + salt * 99991);
-        return codenameList[Math.floor(rng() * codenameList.length)];
-      }, [name, salt]);
+        const picked = codenameList[Math.floor(rng() * codenameList.length)];
+        setResult(picked);        // ボタン押下で初めて値をセット
+        setSalt((s) => s + 1);    // 連打でバリエーションを変えたいので+1（不要なら消してOK）
+      }
 
       return (
         <div className="min-h-screen w-full flex items-center justify-center p-6">
@@ -86,15 +89,17 @@
               />
               <button
                 className="rounded-2xl border border-slate-200 bg-black text-white px-4 py-3 shadow-sm hover:opacity-90 active:opacity-80"
-                onClick={() => setSalt(s => s + 1)}
+                onClick={generateCodename}
               >コードネームを作る</button>
             </div>
 
-            <div className="grid gap-3">
-              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                <div className="text-lg font-semibold tracking-tight">{result}</div>
+            {result && (
+              <div className="grid gap-3">
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                  <div className="text-lg font-semibold tracking-tight">{result}</div>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="mt-8 text-xs text-slate-500 text-center">deterministic by name • client-only • no tracking • made with 鯖の味噌煮</div>
           </div>
