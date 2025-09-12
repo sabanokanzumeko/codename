@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codename Generator</title>
+  <!-- Tailwind CDN (for quick start; fine for prototypes) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-white to-slate-50">
+  <div id="root"></div>
+
+  <!-- React + Babel (JSX compiler in-browser so you don't need Node) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useMemo, useState } = React;
+
+    // --- utilities ----------------------------------------------------------
+    function hashString(str) {
+      // 32-bit FNV-1a
+      let h = 0x811c9dc5;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = (h + (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24)) >>> 0;
+      }
+      return h >>> 0;
+    }
+
+    function mulberry32(seed) {
+      let t = seed >>> 0;
+      return function () {
+        t += 0x6D2B79F5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function pick(rand, arr) { return arr[Math.floor(rand() * arr.length) % arr.length]; }
+
+    function toCase(style, words) {
+      const base = words.filter(Boolean).map(w => w.replace(/[^\p{L}\p{N}]+/gu, " ").trim()).filter(Boolean);
+      if (style === "SCREAMING_SNAKE") return base.map(w => w.toUpperCase().replace(/\s+/g, "_")).join("_");
+      if (style === "kebab") return base.map(w => w.toLowerCase().replace(/\s+/g, "-")).join("-");
+      if (style === "Pascal") return base.map(w => w[0]?.toUpperCase() + w.slice(1).toLowerCase()).join("");
+      if (style === "camel") { const [h, ...t] = base; return [h?.toLowerCase(), ...t.map(w => w[0]?.toUpperCase() + w.slice(1).toLowerCase())].join(""); }
+      return base.join(" ");
+    }
+
+    // --- word banks ---------------------------------------------------------
+    const themes = {
+      Tech: {
+        adjectives: ["Quantum","Neon","Silent","Vector","Binary","Crimson","Cobalt","Phantom","Rapid","Omega","Delta","Nova","Shadow","Stellar","Turbo","Hyper","Frozen","Flux","Zenith","Echo","Apex"],
+        nouns: ["Kernel","Cipher","Matrix","Beacon","Circuit","Pixel","Script","Driver","Module","Anchor","Switch","Adapter","Daemon","Vertex","Packet","Nexus","Engine"]
+      },
+      Nature: {
+        adjectives: ["Green","Verdant","Azure","Blooming","Fresh","Quiet","Swift","Silver","Golden","Hidden","Deep","Morning","Evening","Crystal","Rainy","Sunny","Misty","Windy","Floral","Wild"],
+        nouns: ["Leaf","Sprout","Willow","River","Wave","Peak","Canyon","Meadow","Aurora","Seed","Forest","Stone","Petal","Stream","Harbor","Lagoon","Breeze","Valley","Nest","Grove"]
+      },
+      Mythic: {
+        adjectives: ["Ancient","Arcane","Sacred","Celestial","Eternal","Lunar","Solar","Royal","Vivid","Glorious","Hidden","Noble","Silent","Radiant","Stormforged","True","Fabled","Secret","Primeval","Crimson"],
+        nouns: ["Dragon","Phoenix","Griffin","Chimera","Oracle","Sphinx","Titan","Hydra","Pegasus","Leviathan","Lyre","Crown","Lance","Sanctum","Temple","Runestone","Oath","Aegis","Myth","Halo"]
+      },
+      Kawaii: {
+        adjectives: ["Mochi","Sakura","Maru","Puchi","Neko","Pika","Mizu","Haru","Yuki","Amai","Fuwa","Kira","Sui","Momo","Sora","Hoshi","Usagi","Ringo","Shiro","Aqua"],
+        nouns: ["Panda","Usagi","Neko","Donut","Macaron","Ribbon","Bubble","Cookie","Parfait","Peach","Star","Cloud","Berry","Tulip","Clover","Mint","Mochi","Pudding","Candy","Sprout"]
+      }
+    };
+
+    const separators = [" "," "," ","-","_"," "," "]; // bias towards space
+
+    function App() {
+      const [name, setName] = useState("");
+      const [theme, setTheme] = useState("Nature");
+      const [style, setStyle] = useState("Pascal");
+      const [salt, setSalt] = useState(0);
+      const [count, setCount] = useState(3);
+
+      const results = useMemo(() => {
+        const baseSeed = hashString((name || "anonymous").trim());
+        const out = [];
+        for (let i = 0; i < Math.max(1, Math.min(12, count)); i++) {
+          const rng = mulberry32(baseSeed + i + salt * 99991);
+          const tkeys = Object.keys(themes);
+          const pickedTheme = themes[theme] || themes[tkeys[baseSeed % tkeys.length]];
+          const adj = pick(rng, pickedTheme.adjectives);
+          const noun = pick(rng, pickedTheme.nouns);
+          const sep = pick(rng, separators);
+          const emoji = pick(rng, ["", "", "", "✨", "🌱", "🌀", "🛡️", "🦄", "💠", "🍃", "💫"]);
+          const raw = [adj, noun].join(sep);
+          out.push({ raw, display: `${emoji ? emoji + " " : ""}${toCase(style, [adj, noun])}` });
+        }
+        return out;
+      }, [name, theme, style, salt, count]);
+
+      const copy = async (text) => {
+        try { await navigator.clipboard.writeText(text); alert("Copied: " + text); } catch (e) { console.error(e); }
+      };
+
+      return (
+        <div className="min-h-screen w-full flex items-center justify-center p-6">
+          <div className="w-full max-w-3xl">
+            <div className="mb-6 text-center">
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Codename Generator</h1>
+              <p className="text-slate-600 mt-2">タイプして即生成。常に同じ名前→同じ結果（ソルトでバリエーション）。</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <input
+                className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                placeholder="名前（例：Hasegawa Miyu / 長谷川実柚）"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <button
+                className="rounded-2xl border border-slate-200 bg-black text-white px-4 py-3 shadow-sm hover:opacity-90 active:opacity-80"
+                onClick={() => setSalt(s => s + 1)}
+              >バリエーション（ソルト+1）</button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6">
+              <label className="flex items-center gap-2 justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <span className="text-slate-600">テーマ</span>
+                <select className="bg-transparent outline-none" value={theme} onChange={(e) => setTheme(e.target.value)}>
+                  {Object.keys(themes).map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </label>
+
+              <label className="flex items-center gap-2 justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <span className="text-slate-600">表記</span>
+                <select className="bg-transparent outline-none" value={style} onChange={(e) => setStyle(e.target.value)}>
+                  {[["Pascal","PascalCase"],["camel","camelCase"],["kebab","kebab-case"],["SCREAMING_SNAKE","SCREAMING_SNAKE"]].map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                </select>
+              </label>
+
+              <label className="flex items-center gap-2 justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <span className="text-slate-600">件数</span>
+                <input type="number" min="1" max="12" className="bg-transparent outline-none w-20 text-right" value={count} onChange={(e) => setCount(parseInt(e.target.value || "1", 10))} />
+              </label>
+
+              <button className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-slate-50" onClick={() => setSalt(0)}>ソルトをリセット</button>
+            </div>
+
+            <div className="grid gap-3">
+              {results.map((r, i) => (
+                <div key={i} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                  <div>
+                    <div className="text-lg font-semibold tracking-tight">{r.display}</div>
+                    <div className="text-slate-500 text-sm">seed={hashString((name || "anonymous").trim()) + i + salt * 99991}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button className="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50" onClick={() => copy(r.display)}>コピー</button>
+                    <button className="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50" onClick={() => copy(toCase(style, r.raw.split(/[ _-]/)))}>コード用</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 text-xs text-slate-500 text-center">deterministic by name • client‑only • no tracking • made with ❤️</div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
