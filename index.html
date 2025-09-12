@@ -62,18 +62,12 @@
     function App() {
       const [name, setName] = useState("");
       const [salt, setSalt] = useState(0);
-      const [count, setCount] = useState(3);
 
-      const results = useMemo(() => {
+      const result = useMemo(() => {
         const baseSeed = hashString((name || "anonymous").trim());
-        const out = [];
-        for (let i = 0; i < Math.max(1, Math.min(20, count)); i++) {
-          const rng = mulberry32(baseSeed + i + salt * 99991);
-          const picked = codenameList[Math.floor(rng() * codenameList.length)];
-          out.push(picked);
-        }
-        return out;
-      }, [name, salt, count]);
+        const rng = mulberry32(baseSeed + salt * 99991);
+        return codenameList[Math.floor(rng() * codenameList.length)];
+      }, [name, salt]);
 
       return (
         <div className="min-h-screen w-full flex items-center justify-center p-6">
@@ -93,36 +87,16 @@
               <button
                 className="rounded-2xl border border-slate-200 bg-black text-white px-4 py-3 shadow-sm hover:opacity-90 active:opacity-80"
                 onClick={() => setSalt(s => s + 1)}
-              >バリエーション（ソルト+1）</button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-              <label className="flex items-center gap-2 justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <span className="text-slate-600">件数</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="20"
-                  className="bg-transparent outline-none w-20 text-right"
-                  value={count}
-                  onChange={(e) => setCount(parseInt(e.target.value || "1", 10))}
-                />
-              </label>
-              <button
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm hover:bg-slate-50"
-                onClick={() => setSalt(0)}
-              >ソルトをリセット</button>
+              >コードネームを作る</button>
             </div>
 
             <div className="grid gap-3">
-              {results.map((r, i) => (
-                <div key={i} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                  <div className="text-lg font-semibold tracking-tight">{r}</div>
-                </div>
-              ))}
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                <div className="text-lg font-semibold tracking-tight">{result}</div>
+              </div>
             </div>
 
-            <div className="mt-8 text-xs text-slate-500 text-center">deterministic by name • client‑only • no tracking • made with ❤️</div>
+            <div className="mt-8 text-xs text-slate-500 text-center">deterministic by name • client-only • no tracking • made with ❤️</div>
           </div>
         </div>
       );
